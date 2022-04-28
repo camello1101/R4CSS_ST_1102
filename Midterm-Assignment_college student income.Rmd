@@ -1,0 +1,106 @@
+---
+title: "Midterm-Assignment"
+author: "駱姿宇"
+date: "2022/4/24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = 'hold', comment = '#>', error = TRUE)
+```
+
+```{r}
+knitr::include_graphics('data/plot_income_raw.jpg')
+# 【原圖的做法】
+#   以長條圖呈現數據
+#   x軸是各級學校組成百分比：從0-100%級距為10%、y軸是學生家戶所得分級：從最富有的前0.1％到底層的20%共分為9個階級
+#   標題與次標題皆靠左，因字數較多、長，因此有適當斷句、換行
+#   刪除圖例改以直接標記在長條圖上
+#   顏色上前段學校採用高飽和度的暖色系；後段學校採用低飽和度的冷色系；未讀大學及資料不全者以灰色視之
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+
+df_income_raw <- read_csv("data/mrc_table6.csv")
+df_income_raw %>% glimpse()
+```
+
+```{r}
+#  【根據不完全一樣的台灣資料（台灣資料在Chunk6）－調整原圖作法】
+#   以長條圖呈現數據
+#   x軸是各級學校，原始資料分為14類，其中2類缺漏，因此表中共有12類；
+#   y軸為學生家戶所得分級，原始圖分9級，但取得原始資料僅8級，因此從最富有的前1％到底層的20%共分為8個階級，從0-100%級距為25%（做xy軸置換）
+#   標題與次標題皆靠左，因字數較多、長，因此有適當斷句、換行
+#   由於原圖字數較多者會超出bar範圍，並沒有比較好看懂，因此保留圖例
+#   由於項目剛好是8個，顏色上以彩虹顏色區分，簡單暴力；收入最低者以灰色視之
+```
+
+```{r message=FALSE, warning=FALSE}
+th <- theme(plot.background = element_rect(colour = "black", size = 0.5, linetype = 1, fill = "white"), 
+          panel.background = element_rect(fill= "white"), 
+          plot.title = element_text(colour = "black", face = "bold", size = 14), 
+          plot.subtitle = element_text(colour = "black", size = 8), 
+          plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "inches"))
+
+df_income_cleaned <-df_income_raw  %>%
+    group_by(tier_name) %>%
+    mutate(clean_top1pc = sum(k_top1pc),
+           tal_top5pc = sum(k_top5pc), 
+           clean_top5pc = tal_top5pc-clean_top1pc,
+           tal_top10pc = sum(k_top10pc),
+           clean_top10pc = tal_top10pc-tal_top5pc,
+           tal_q5 = sum(k_q5),
+           clean_q5 = tal_q5 - tal_top10pc,
+           clean_q4 = sum(k_q4),
+           clean_q3 = sum(k_q3),
+           clean_q2 = sum(k_q2),
+           clean_q1 = sum(k_q1)) %>% 
+    select(tier, tier_name, clean_top1pc, clean_top5pc, clean_top10pc,clean_q5, clean_q4, clean_q3, clean_q2, clean_q1) %>% 
+    filter(!duplicated(tier_name)) %>% 
+    gather(key = "income_level", value = "total", 
+           clean_top1pc, clean_top5pc, clean_top10pc,clean_q5, clean_q4, clean_q3, clean_q2, clean_q1) %>% 
+    arrange(tier_name) %>% 
+    ggplot() + aes(tier_name, total, fill = income_level) %>%
+    geom_col() +
+    xlim("Never attended college (before year 2013)", "Late attender (ages 23-28)", 
+         "Attending college with insufficient data", #"Less than two-year schools of any type", #"Two-year for-profit",  
+         "Four-year for-profit","Nonselective four-year private not-for-profit",  "Nonselective four-year public", 
+         "Selective private", "Selective public", "Highly selective private", "Highly selective public", 
+         "Other elite schools (public and private)", "Ivy Plus") + 
+    coord_flip() +
+    scale_fill_manual(
+        limits=c("clean_top1pc", "clean_top5pc", "clean_top10pc", "clean_q5", "clean_q4", "clean_q3", "clean_q2", "clean_q1"),
+        values=c("red", "orange", "yellow", "green", "blue", "skyblue", "purple", "grey"),
+        name="Income level", 
+        breaks=c("clean_top5pc", "clean_top1pc", "clean_top10pc", "clean_q5", "clean_q4", "clean_q3", "clean_q2", "clean_q1"),
+        labels=c("Top1%", "Top5%", "Top10%", "Top20%", "4th quintile", "3rd quintile", "2nd quintile", "Bottom 20%"),
+        na.value = "lightgrey") +
+    labs(title = "Where today’s 25-year-olds went to college, \ngrouped by their parents’ income",
+         subtitle = "About four in 10 students from the top 0.1 percent attend an Ivy League or elite university, \nroughly equivalent to the share of students from poor families \nwho attend any two- or four-year college.",
+         x = "",
+         y = "") + th
+```
+
+```{r message=FALSE, warning=FALSE}
+df_twincome_raw <- read_csv("data/CS_lowincome.csv")
+df_twincome_raw %>% glimpse()
+df_twincome_cleaned <- df_twincome_raw %>% 
+    filter(學年度 %in% c("105")) %>% 
+    gather(key = "level", value = "people", 
+           '學雜費減免人數-低收入戶學生', '學雜費減免人數-中低收入戶學生', '學雜費減免人數-身心障礙學生及身心障礙人士子女', '學雜費減免人數-特殊境遇家庭之子女', '學雜費減免人數-原住民學生') %>%
+    arrange(學校名稱) %>%
+    filter(!duplicated('學雜費減免人數-小計'))
+```
+
+```{r}
+# 【不完全一樣的台灣資料－期待作法】
+#   以長條圖呈現數據
+#   由於資料中沒有各校當年度的學生總數，需要查找；另將各大學按照排名分為前五名指台灣大學、政治大學、清華大學、交通大學、成功大學；前十名再加上：中央大學、中山大學、台灣師範大學、台灣科技大學以及陽明大學；前二十名則另外包含：台北大學、中正大學、中大學、台北科技大學、台北醫學院、淡江大學、長庚大學、東吳大學、元智大學、逢甲大學（參考：https://www.twreporter.org/a/education-opportunity-inequality-across-income）
+#   x軸是依照弱勢學生分類為5種（沒有階級之分）；y軸為各級學校組成百分比：從0-100%級距為25%（做xy軸置換）
+#   標題與次標題皆靠左，適當斷句、換行
+#   由於項目不多，刪除圖例直接標記在長條圖上
+#   顏色上會用「以收入評斷為弱勢學生」及「非以收入評斷的其他弱勢學生」做區分
+```
